@@ -13,9 +13,22 @@
 - `lib/index.js` — 服务端：`ctx.on('session/event')` 游标重放，提取 `assistant/message` /
   `assistant/attempt` 里的 usage（与 `dsh-token-meter` 相同口径），环形账本（200 条），
   经自有 `/api/turn-usage` RPC 暴露 `usage.list` / `usage.clear`。
-- `lib/ledger.js` — 账本：按 turn 聚合 attempt，算命中率 `cacheRead / (input + cacheRead + cacheWrite)`。
+  **0.2.0 起 RPC 强制要求 `sessionId`**（session 隔离），不带会被拒绝。
+- `lib/ledger.js` — 账本：按 turn 聚合 attempt，算命中率 `cacheRead / (input + cacheRead + cacheWrite)`；
+  记录本身按 sessionId 分桶，`list` / `clear` 均按会话过滤（`'*'` 才是全局）。
 - `client-src/index.js` — 侧边栏 tab（注册到 `dsh-better-sidebar`），5 秒自动刷新可关，
   最新一轮命中率大字显示，颜色分档（≥80% 绿 / ≥40% 黄 / <40% 红）。
+  **0.2.0 起从 tab 的 `props.scope.sessionId` 取当前会话 id**，所有请求按会话隔离：
+  切换会话后各看各的记录，不再把所有会话混在一起。
+
+## 0.2.0 变更：session 隔离
+
+旧版（0.1.0）的侧边栏请求不带 sessionId，服务端把所有会话的记录混合按时间排序返回，
+多会话使用时互相串台。0.2.0 的隔离口径：
+
+1. 客户端从 better-sidebar 的 tab scope 取 `sessionId`，随每次 `usage.list` / `usage.clear` 请求携带；
+2. 服务端校验 `sessionId` 必传，缺省直接返回 `session-required` 错误；
+3. "清空"只清当前会话；全局清空需显式传 `'*'`（当前 UI 不提供）。
 
 ## 安装
 

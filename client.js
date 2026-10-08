@@ -75,19 +75,24 @@ ${new Date(t.ts).toLocaleString()}` }, fmtTime(t.ts)),
   );
 }
 var tdStyle = { padding: "3px 8px", whiteSpace: "nowrap", fontSize: 12 };
-function TurnUsagePanel({ rpcCall, visible }) {
+function TurnUsagePanel({ rpcCall, visible, sessionId }) {
   const [rows, setRows] = React.useState(null);
   const [error, setError] = React.useState(null);
   const [auto, setAuto] = React.useState(true);
   const load = React.useCallback(async () => {
+    if (!sessionId) {
+      setRows(null);
+      setError("无法确定当前会话（sessionId 缺失）");
+      return;
+    }
     try {
-      const value = await rpcCall("usage.list", { limit: 400 });
+      const value = await rpcCall("usage.list", { limit: 400, sessionId });
       setRows(value.sessions ?? []);
       setError(null);
     } catch (e) {
       setError(e.message);
     }
-  }, [rpcCall]);
+  }, [rpcCall, sessionId]);
   React.useEffect(() => {
     if (visible === false) return;
     load();
@@ -127,9 +132,10 @@ function TurnUsagePanel({ rpcCall, visible }) {
         { onClick: () => setAuto((a) => !a), style: btnStyle },
         auto ? "自动刷新: 开" : "自动刷新: 关"
       ),
+      // 清空只影响当前会话（sessionId 随请求携带，服务端按会话删除）
       h("button", {
         onClick: async () => {
-          await rpcCall("usage.clear", {});
+          await rpcCall("usage.clear", { sessionId });
           load();
         },
         style: btnStyle
@@ -176,12 +182,15 @@ function apply(ctx) {
     scope.effect(() => scope.betterSidebar.registerTab({
       id: TAB_ID,
       title: "每轮用量",
-      description: "每一轮请求的输入、缓存命中率、输出与时间",
+      description: "每一轮请求的输入、缓存命中率、输出与时间（按会话隔离）",
       order: 31,
       single: true,
       component: (props) => h(TurnUsagePanel, {
         rpcCall,
-        visible: props.visible !== false
+        visible: props.visible !== false,
+        // tab 所属会话的 id（dsh-better-sidebar 对每个会话单独 scoping，
+        // props.scope.sessionId 即当前会话；与 dsh-graph-workflow 同款取法）
+        sessionId: props.scope?.sessionId
       })
     }), "turn-usage: sidebar tab");
   });

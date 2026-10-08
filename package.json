@@ -1,6 +1,6 @@
 {
   "name": "dsh-turn-usage",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "每轮 token 明细侧边栏：输入、缓存命中、输出、时间戳、命中率",
   "type": "module",
   "main": "lib/index.js",

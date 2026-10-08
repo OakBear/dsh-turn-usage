@@ -46,18 +46,25 @@ const tdStyle = { padding: '3px 8px', whiteSpace: 'nowrap', fontSize: 12 };
 
 /* ---------- panel ---------- */
 
-function TurnUsagePanel({ rpcCall, visible }) {
+function TurnUsagePanel({ rpcCall, visible, sessionId }) {
   const [rows, setRows] = React.useState(null);
   const [error, setError] = React.useState(null);
   const [auto, setAuto] = React.useState(true);
 
+  // 0.2.0 session 隔离：数据请求始终携带当前会话的 sessionId，
+  // 服务端只返回该会话的记录，切换会话后各看各的，不再串台。
   const load = React.useCallback(async () => {
+    if (!sessionId) {
+      setRows(null);
+      setError('无法确定当前会话（sessionId 缺失）');
+      return;
+    }
     try {
-      const value = await rpcCall('usage.list', { limit: 400 });
+      const value = await rpcCall('usage.list', { limit: 400, sessionId });
       setRows(value.sessions ?? []);
       setError(null);
     } catch (e) { setError(e.message); }
-  }, [rpcCall]);
+  }, [rpcCall, sessionId]);
 
   React.useEffect(() => {
     if (visible === false) return;
@@ -86,8 +93,9 @@ function TurnUsagePanel({ rpcCall, visible }) {
       h('button', { onClick: load, style: btnStyle }, '刷新'),
       h('button', { onClick: () => setAuto(a => !a), style: btnStyle },
         auto ? '自动刷新: 开' : '自动刷新: 关'),
+      // 清空只影响当前会话（sessionId 随请求携带，服务端按会话删除）
       h('button', {
-        onClick: async () => { await rpcCall('usage.clear', {}); load(); }, style: btnStyle,
+        onClick: async () => { await rpcCall('usage.clear', { sessionId }); load(); }, style: btnStyle,
       }, '清空')),
     error && h('div', { style: { color: 'var(--dsh-red, #dc2626)', fontSize: 12, margin: '6px 0' } }, `读取失败: ${error}`),
     // 明细表
@@ -123,12 +131,15 @@ export function apply(ctx) {
     scope.effect(() => scope.betterSidebar.registerTab({
       id: TAB_ID,
       title: '每轮用量',
-      description: '每一轮请求的输入、缓存命中率、输出与时间',
+      description: '每一轮请求的输入、缓存命中率、输出与时间（按会话隔离）',
       order: 31,
       single: true,
       component: props => h(TurnUsagePanel, {
         rpcCall,
         visible: props.visible !== false,
+        // tab 所属会话的 id（dsh-better-sidebar 对每个会话单独 scoping，
+        // props.scope.sessionId 即当前会话；与 dsh-graph-workflow 同款取法）
+        sessionId: props.scope?.sessionId,
       }),
     }), 'turn-usage: sidebar tab');
   });
