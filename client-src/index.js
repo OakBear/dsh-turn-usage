@@ -46,25 +46,29 @@ const tdStyle = { padding: '3px 8px', whiteSpace: 'nowrap', fontSize: 12 };
 
 /* ---------- panel ---------- */
 
-function TurnUsagePanel({ rpcCall, visible, sessionId }) {
+function TurnUsagePanel({ rpcCall, visible, sessionId, store }) {
   const [rows, setRows] = React.useState(null);
   const [error, setError] = React.useState(null);
   const [auto, setAuto] = React.useState(true);
 
+  // sessionId 兜底：scope.sessionId 优先，取不到时从 sidebar store 快照拿
+  // （与 dsh-better-sidebar 内部 `scope?.sessionId ?? store.getSnapshot().sessionId` 同款）。
+  const sid = sessionId ?? store?.getSnapshot?.().sessionId;
+
   // 0.2.0 session 隔离：数据请求始终携带当前会话的 sessionId，
   // 服务端只返回该会话的记录，切换会话后各看各的，不再串台。
   const load = React.useCallback(async () => {
-    if (!sessionId) {
+    if (!sid) {
       setRows(null);
       setError('无法确定当前会话（sessionId 缺失）');
       return;
     }
     try {
-      const value = await rpcCall('usage.list', { limit: 400, sessionId });
+      const value = await rpcCall('usage.list', { limit: 400, sessionId: sid });
       setRows(value.sessions ?? []);
       setError(null);
     } catch (e) { setError(e.message); }
-  }, [rpcCall, sessionId]);
+  }, [rpcCall, sid]);
 
   React.useEffect(() => {
     if (visible === false) return;
@@ -138,8 +142,9 @@ export function apply(ctx) {
         rpcCall,
         visible: props.visible !== false,
         // tab 所属会话的 id（dsh-better-sidebar 对每个会话单独 scoping，
-        // props.scope.sessionId 即当前会话；与 dsh-graph-workflow 同款取法）
+        // props.scope.sessionId 即当前会话；store 作为兜底来源一并传入）
         sessionId: props.scope?.sessionId,
+        store: props.store,
       }),
     }), 'turn-usage: sidebar tab');
   });
