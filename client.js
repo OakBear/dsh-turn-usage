@@ -175,7 +175,7 @@ var btnStyle = {
 };
 function apply(ctx) {
   const rpcCall = async (method, payload) => {
-    const result = await ctx.connection.rpc.call("/api", "turn-usage", { method, payload });
+    const result = await ctx.connection.rpc.call("/api", "turn-usage", { method, ...payload });
     if (!result?.ok) throw new Error(result?.error?.message || "无法读取每轮用量");
     return result.value;
   };

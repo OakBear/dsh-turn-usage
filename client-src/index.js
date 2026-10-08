@@ -126,7 +126,10 @@ const btnStyle = {
 
 export function apply(ctx) {
   const rpcCall = async (method, payload) => {
-    const result = await ctx.connection.rpc.call('/api', 'turn-usage', { method, payload });
+    // 注意：rpc.call 第三参直接作为信封的 payload 字段。服务端只读外层，
+    // 所以这里必须把业务字段拍平（{ method, ...payload }），
+    // 不能再嵌一层 { method, payload }（0.2.0 初版的 bug：sessionId 取不到）。
+    const result = await ctx.connection.rpc.call('/api', 'turn-usage', { method, ...payload });
     if (!result?.ok) throw new Error(result?.error?.message || '无法读取每轮用量');
     return result.value;
   };
